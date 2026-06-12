@@ -1,0 +1,36 @@
+# ========================
+# Python & Backend
+# ========================
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ========================
+# Node.js & Frontend
+# ========================
+node_modules/
+.next/
+out/
+build/
+.npm/
+dist/
+
+# ========================
+# Environment Variables
+# ========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ========================
+# OS & IDE Files
+# ========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
