@@ -1,26 +1,36 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-body {
-  background-color: theme('colors.recon.bgPrimary');
-  color: theme('colors.recon.textPrimary');
-  /* The blueprint emphasizes a spatial, non-scrolling cockpit feel */
-  height: 100vh;
-  overflow-x: hidden;
+@theme {
+  /* Silent Coder Design System */
+  --color-recon-bgPrimary: #1A1A1A;
+  --color-recon-bgSurface: #222222;
+  --color-recon-bgCard: #1E1E1E;
+  --color-recon-accentGreen: #1A6B3A;
+  --color-recon-accentGreenLight: #22883F;
+  --color-recon-borderDefault: #2A2A2A;
+  --color-recon-borderHover: #1A6B3A;
+  --color-recon-textPrimary: #E8E8E8;
+  --color-recon-textMuted: #888888;
+  --color-recon-textHint: #555555;
+  --color-recon-critRed: #C0392B;
+  --color-recon-highOrange: #E67E22;
+  --color-recon-medYellow: #F1C40F;
+  --color-recon-lowGreen: #2ECC71;
+  --color-recon-codeBg: #111111;
+  --color-recon-codeText: #7EC8A4;
 }
 
-/* Custom scrollbar for the scrollable vulnerability section */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: theme('colors.recon.bgPrimary');
+  background-color: var(--color-recon-bgPrimary);
 }
 ::-webkit-scrollbar-thumb {
-  background: theme('colors.recon.borderDefault');
+  background-color: var(--color-recon-borderDefault);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: theme('colors.recon.accentGreen');
+  background-color: var(--color-recon-accentGreen);
 }
