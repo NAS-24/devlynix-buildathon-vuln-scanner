@@ -119,109 +119,100 @@ async def get_report(report_id: str):
     return document
 
 
-async def run_header_checks(url: str):
-    return [
-        {"vulnerability_name": "Content Security Policy (CSP)", "passed": True, "severity": "Info", "description": "CSP header is present. The application is actively restricting resource loading.", "remediation": None},
-        {"vulnerability_name": "HTTP Strict Transport Security (HSTS)", "passed": True, "severity": "Info", "description": "HSTS header is present. The application enforces secure connections.", "remediation": None},
-        {"vulnerability_name": "X-Frame-Options (Clickjacking)", "passed": True, "severity": "Info", "description": "X-Frame-Options header is present. The application is protected against UI redress attacks.", "remediation": None}
-    ]
-
-async def run_injection_checks(url: str):
-    return [
-        {"vulnerability_name": "Reflected XSS", "passed": False, "severity": "High", "description": f"Reflected XSS confirmed at form input at {url}/signup. The payload was reflected back unescaped.", "remediation": "Sanitise all user input server-side and encode all output before rendering."},
-        {"vulnerability_name": "SQL Injection (SQLi)", "passed": True, "severity": "Pass", "description": "No SQL injection signals detected. Tested 5 forms and URL parameters.", "remediation": "No action required. Continue using parameterised queries."}
-    ]
-
-async def check_sensitive_files(url: str):
-    return [
-        {"vulnerability_name": "Sensitive File Exposure", "passed": False, "severity": "High", "description": f"Sensitive paths publicly accessible. Most critical: Debug Endpoint at {url}/debug.", "remediation": "Block all sensitive paths at the web server level."}
-    ]
-
-async def check_dependencies(url: str):
-    return [
-        {"vulnerability_name": "Outdated Dependencies (CVEs)", "passed": False, "severity": "Info", "description": "Outdated packages detected in application footprint.", "remediation": "Update dependencies to latest stable versions."}
-    ]
-
-def calculate_risk_score(vulnerabilities: list):
-    # Dynamically calculate risk based on failed checks
-    base_score = 100
-    for vuln in vulnerabilities:
-        if not vuln.get("passed"):
-            sev = vuln.get("severity", "").lower()
-            if sev == "critical": base_score -= 25
-            elif sev == "high": base_score -= 15
-            elif sev == "medium": base_score -= 10
-            elif sev == "low": base_score -= 5
-    return max(0, base_score) # Don't go below 0
-
-def generate_radar_scores(vulnerabilities: list):
-    # Dynamic radar based on the target
-    return {
-        "headers": 80, 
-        "injection": 40, 
-        "deps": 30, 
-        "auth": 90, 
-        "tls": 85
+def generate_radar_scores(vulnerabilities: list) -> dict:
+    """
+    Calculates security scores (0-100) per category based on scan results.
+    100 = Perfect security, 0 = High risk.
+    """
+    # Initialize with perfect scores
+    scores = {
+        "headers": 100,
+        "injection": 100,
+        "deps": 100,
+        "auth": 100,
+        "tls": 100
     }
 
+    # Map your vulnerability names to radar categories
+    # Adjust these keys based on what your scanners return
+    mapping = {
+        "Content Security Policy (CSP)": "headers",
+        "HTTP Strict Transport Security (HSTS)": "headers",
+        "X-Frame-Options (Clickjacking)": "headers",
+        "Reflected XSS": "injection",
+        "SQL Injection (SQLi)": "injection",
+        "Sensitive File Exposure": "injection", # Or a new category
+        "Outdated Dependencies (CVEs)": "deps"
+    }
+
+    for vuln in vulnerabilities:
+        category = mapping.get(vuln.get("vulnerability_name"), "headers")
+        
+        # If the check failed, deduct points based on severity
+        if not vuln.get("passed", True):
+            sev = vuln.get("severity", "Medium").lower()
+            deduction = 0
+            if sev == "critical": deduction = 40
+            elif sev == "high": deduction = 25
+            elif sev == "medium": deduction = 15
+            elif sev == "low": deduction = 10
+            
+            # Apply deduction and keep floor at 0
+            scores[category] = max(0, scores[category] - deduction)
+
+    return scores
 
 @app.get("/api/stream-scan")
 async def stream_scan(target_url: str):
-    """
-    Executes scanners sequentially and yields results one by one using Server-Sent Events (SSE).
-    """
     async def event_generator():
         try:
-            # Tell the frontend the scan is starting
             yield f"data: {json.dumps({'status': 'started', 'target': target_url})}\n\n"
             
-            # --- Scanner 1: Headers ---
-            # Simulate slight processing time so the UI animation looks good
-            await asyncio.sleep(1) 
-            headers_result = await run_header_checks(target_url)
-            yield f"data: {json.dumps({'status': 'progress', 'result': headers_result[0]})}\n\n"
-            yield f"data: {json.dumps({'status': 'progress', 'result': headers_result[1]})}\n\n"
-            yield f"data: {json.dumps({'status': 'progress', 'result': headers_result[2]})}\n\n"
+            # Initialize real scanners
+            scanners = {
+                "headers": [CSPScanner(), HSTSScanner(), XFrameScanner()],
+                "injection": [XSSScanner(), SQLiScanner()],
+                "sensitive": [SensitiveFileScanner()],
+                "deps": [CVEScanner()] # Note: Only run if github.com is in URL
+            }
 
-            # --- Scanner 2: Injection ---
-            await asyncio.sleep(1.5)
-            injection_result = await run_injection_checks(target_url)
-            yield f"data: {json.dumps({'status': 'progress', 'result': injection_result[0]})}\n\n"
-            yield f"data: {json.dumps({'status': 'progress', 'result': injection_result[1]})}\n\n"
+            all_results = []
 
-            # --- Scanner 3: Sensitive Files ---
-            await asyncio.sleep(2)
-            sensitive_result = await check_sensitive_files(target_url)
-            yield f"data: {json.dumps({'status': 'progress', 'result': sensitive_result[0]})}\n\n"
+            # Run Headers
+            for scanner in scanners["headers"]:
+                res = await scanner.scan(target_url)
+                all_results.append(res.model_dump())
+                yield f"data: {json.dumps({'status': 'progress', 'result': res.model_dump()})}\n\n"
+                await asyncio.sleep(0.5)
 
-            # --- Scanner 4: Dependencies ---
-            await asyncio.sleep(1)
-            deps_result = await check_dependencies(target_url)
-            yield f"data: {json.dumps({'status': 'progress', 'result': deps_result[0]})}\n\n"
+            # Run Injection
+            for scanner in scanners["injection"]:
+                res = await scanner.scan(target_url)
+                all_results.append(res.model_dump())
+                yield f"data: {json.dumps({'status': 'progress', 'result': res.model_dump()})}\n\n"
+                await asyncio.sleep(0.5)
 
-            # --- Finalize and Save to DB ---
-            all_vulnerabilities = headers_result + injection_result + sensitive_result + deps_result
+            # Run Sensitive
+            for scanner in scanners["sensitive"]:
+                res = await scanner.scan(target_url)
+                all_results.append(res.model_dump())
+                yield f"data: {json.dumps({'status': 'progress', 'result': res.model_dump()})}\n\n"
+
+            # Finalize
+            risk_score = calculate_risk_score(all_results)
+            radar_scores = generate_radar_scores(all_results)
             
-            # Use our existing scoring logic
-            risk_score = calculate_risk_score(all_vulnerabilities)
-            radar_scores = generate_radar_scores(all_vulnerabilities)
-            
-            # Save the final compiled report to MongoDB
-            from database import save_scan_result
             report_id = await save_scan_result(
                 target_url=target_url,
                 risk_score=risk_score,
                 radar_scores=radar_scores,
-                vulnerabilities=all_vulnerabilities,
-                user_id="anonymous" # Update this later when auth is added
+                vulnerabilities=all_results,
+                user_id="anonymous"
             )
 
-            # Yield the final completion event with the MongoDB report ID
             yield f"data: {json.dumps({'status': 'complete', 'report_id': report_id})}\n\n"
 
         except Exception as e:
-            # If a scanner crashes, yield the error so the frontend knows
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
 
-    # Return the generator as an active text stream
     return StreamingResponse(event_generator(), media_type="text/event-stream")

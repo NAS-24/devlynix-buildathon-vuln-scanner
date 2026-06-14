@@ -40,63 +40,38 @@ export default function BentoGrid({ reportData, isReportView = false }: BentoGri
   }, [reportData]);
 
   // --- THE EVENT SOURCE PIPELINE ---
-  const handleScan = (url: string) => {
-    // 1. Reset UI for a fresh scan
-    setIsScanning(true);
-    setLiveVulns([]);
-    setLiveScore(100); // Start at a perfect 100
-    setFinishedReportId(undefined);
+    const handleScan = (url: string) => {
+        // 1. Reset UI to empty/waiting state
+        setIsScanning(true);
+        setLiveVulns([]);
+        setLiveScore(100); 
 
-    // 2. Open the Server-Sent Events pipe to Python
-    const eventSource = new EventSource(`http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}`);
+        // 2. CONNECT TO BACKEND: This line opens the pipe to Python
+        // It calls the endpoint we just fixed in main.py
+        const eventSource = new EventSource(`http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}`);
 
-    // 3. Catch chunks as they stream in
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+        // 3. LISTEN: Every time Python 'yields' a line, this runs
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
 
-      if (data.status === 'progress') {
-        // Append the new vulnerability chunk to our live array
-        setLiveVulns((prev) => {
-          const updated = [...prev, data.result];
-
-          // Quick frontend math to drop the score live for visual effect!
-          let currentScore = 100;
-          updated.forEach(v => {
-            if (!v.passed) {
-              const sev = v.severity?.toLowerCase();
-              if (sev === 'critical') currentScore -= 25;
-              else if (sev === 'high') currentScore -= 15;
-              else if (sev === 'medium') currentScore -= 10;
-              else if (sev === 'low') currentScore -= 5;
+            if (data.status === 'progress') {
+                // Append the new real-time vulnerability to our list
+                setLiveVulns((prev) => [...prev, data.result]);
+                // (Optional: update score logic here)
+            } else if (data.status === 'complete') {
+                // Scan finished! Close the connection
+                setIsScanning(false);
+                eventSource.close();
             }
-          });
-          setLiveScore(Math.max(0, currentScore));
+        };
 
-          return updated;
-        });
-
-      } else if (data.status === 'complete') {
-        // 1. Add this scan to history before we close
-        setScanHistory(prev => [{ url: url, score: liveScore || 0 }, ...prev].slice(0, 5));
-        
-        // 2. The backend finished
-        setFinishedReportId(data.report_id);
-        setIsScanning(false);
-        eventSource.close();
-
-      } else if (data.status === 'error') {
-        console.error("Scanner Error:", data.message);
-        setIsScanning(false);
-        eventSource.close();
-      }
+        // 4. Handle connection errors
+        eventSource.onerror = (err) => {
+            console.error("Connection lost:", err);
+            eventSource.close();
+            setIsScanning(false);
+        };
     };
-
-    eventSource.onerror = (err) => {
-      console.error("SSE Pipeline Broken", err);
-      setIsScanning(false);
-      eventSource.close();
-    };
-  };
 
   // Smart Sort: Put FAILED checks at the front
   const sortedVulns = [...liveVulns].sort((a, b) => {
