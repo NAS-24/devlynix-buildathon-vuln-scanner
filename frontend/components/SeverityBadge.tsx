@@ -1,22 +1,26 @@
+'use client';
 import React from 'react';
 
-type Severity = 'Critical' | 'High' | 'Medium' | 'Low' | 'Pass';
+// 1. Add 'Info' to this type list!
+type Severity = 'Critical' | 'High' | 'Medium' | 'Low' | 'Info' | 'Pass';
 
 interface SeverityBadgeProps {
   severity: Severity;
 }
 
 export default function SeverityBadge({ severity }: SeverityBadgeProps) {
-  const styles: Record<Severity, string> = {
-    Critical: 'bg-[#3A1A1A] text-[#E74C3C]',
-    High: 'bg-[#3A2A1A] text-recon-highOrange',
-    Medium: 'bg-[#2A2A1A] text-recon-medYellow',
-    Low: 'bg-[#1A2A1A] text-recon-lowGreen',
-    Pass: 'bg-[#1A2A1A] text-recon-accentGreen',
+  // 2. Add a color mapping for Info so it renders nicely
+  const styles = {
+    Critical: 'text-recon-critRed border-recon-critRed/20 bg-recon-critRed/5',
+    High: 'text-recon-highOrange border-recon-highOrange/20 bg-recon-highOrange/5',
+    Medium: 'text-recon-medYellow border-recon-medYellow/20 bg-recon-medYellow/5',
+    Low: 'text-recon-lowGreen border-recon-lowGreen/20 bg-recon-lowGreen/5',
+    Info: 'text-recon-textMuted border-recon-borderDefault bg-recon-bgSurface', // New Info Style
+    Pass: 'text-recon-lowGreen border-recon-lowGreen/20 bg-recon-lowGreen/5',
   };
 
   return (
-    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium tracking-wider uppercase ${styles[severity]}`}>
+    <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border ${styles[severity]}`}>
       {severity}
     </span>
   );

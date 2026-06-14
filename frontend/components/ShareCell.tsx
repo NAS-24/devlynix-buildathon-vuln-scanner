@@ -1,5 +1,10 @@
 'use client';
 import React, { useState } from 'react';
+import { Copy, FileText, Code, CheckCircle, ExternalLink } from 'lucide-react';
+
+interface ShareCellProps {
+  reportId?: string;
+}
 
 // Mock local storage data for the UI checkpoint
 const MOCK_HISTORY = [
@@ -8,13 +13,18 @@ const MOCK_HISTORY = [
   { url: 'github.com/user/proj', score: 61 }
 ];
 
-export default function ShareCell() {
+export default function ShareCell({ reportId }: ShareCellProps) {
   const [copied, setCopied] = useState(false);
   const [showHistory, setShowHistory] = useState(true); // Default to open so judges see it immediately
-  const mockId = 'k7xBp2nQ';
+  
+  // Use the real reportId if passed down, otherwise fallback
+  const displayId = reportId || 'k7xBp2nQ';
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`recon.app/report/${mockId}`);
+    // Dynamically construct the URL so it works locally and in production
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://recon.app';
+    navigator.clipboard.writeText(`${baseUrl}/report/${displayId}`);
+    
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -29,7 +39,7 @@ export default function ShareCell() {
       {/* Unique URL Box */}
       <div className="flex items-center justify-between bg-recon-codeBg border border-recon-borderDefault p-3 rounded-lg mb-3">
         <span className="text-recon-accentGreen font-mono text-xs truncate mr-2">
-          recon.app/report/{mockId}
+          {displayId}
         </span>
         <button 
           onClick={handleCopy}
@@ -37,7 +47,7 @@ export default function ShareCell() {
             copied ? 'bg-recon-lowGreen text-[#1A1A1A]' : 'bg-recon-bgSurface hover:bg-recon-borderDefault text-recon-textPrimary'
           }`}
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? 'Copied!' : 'Copy Link'}
         </button>
       </div>
 
@@ -47,11 +57,30 @@ export default function ShareCell() {
 
       {/* Export Buttons */}
       <div className="flex gap-3 mb-8">
-        <button className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted">
+        <button 
+          onClick={() => window.print()}
+          className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted"
+        >
           <span className="text-lg mb-1">📄</span>
           <span className="text-[10px] uppercase tracking-widest font-bold">PDF</span>
         </button>
-        <button className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted">
+        <button 
+          onClick={() => {
+            // Check if we are on the report page to download the actual embedded JSON
+            const dataElement = document.getElementById('report-data');
+            if (dataElement) {
+              const data = JSON.parse(dataElement.innerHTML);
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `recon-scan-${displayId}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }
+          }}
+          className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted"
+        >
           <span className="text-lg mb-1">{`{ }`}</span>
           <span className="text-[10px] uppercase tracking-widest font-bold">JSON</span>
         </button>

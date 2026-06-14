@@ -1,17 +1,25 @@
+'use client';
+
 import React from 'react';
 import RadarChart from './RadarChart';
 
 interface RiskScoreProps {
-  score: number;
-  counts: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
+  realScore?: number;
+  realRadar?: any;
+  vulnerabilities?: any[];
 }
 
-export default function RiskScoreCell({ score, counts }: RiskScoreProps) {
+export default function RiskScoreCell({ realScore, realRadar, vulnerabilities = [] }: RiskScoreProps) {
+  const score = realScore !== undefined ? realScore : 42;
+  
+  // Dynamically count the severities of ONLY the failed checks
+  const counts = vulnerabilities.reduce((acc, vuln) => {
+    if (!vuln.passed && vuln.severity) {
+      const sev = vuln.severity.toLowerCase();
+      if (acc[sev] !== undefined) acc[sev]++;
+    }
+    return acc;
+  }, { critical: 0, high: 0, medium: 0, low: 0, info: 0 });
 
   let ringColor = 'border-recon-critRed';
   let textColor = 'text-recon-critRed';
@@ -27,7 +35,7 @@ export default function RiskScoreCell({ score, counts }: RiskScoreProps) {
     statusText = 'AT RISK';
   }
 
- 
+  // Find the highest count to scale the bars properly
   const maxCount = Math.max(counts.critical, counts.high, counts.medium, counts.low, 1);
 
   return (
@@ -40,12 +48,10 @@ export default function RiskScoreCell({ score, counts }: RiskScoreProps) {
         <span className="text-[10px] text-recon-textHint mt-1">/ 100</span>
       </div>
 
-      
       <span className={`text-sm font-bold tracking-wider mb-10 uppercase ${textColor}`}>
         {statusText}
       </span>
 
-   
       <div className="w-full flex flex-col gap-4 mt-auto z-10">
         <BarRow label="Critical" count={counts.critical} max={maxCount} color="bg-recon-critRed" />
         <BarRow label="High" count={counts.high} max={maxCount} color="bg-recon-highOrange" />
@@ -53,17 +59,16 @@ export default function RiskScoreCell({ score, counts }: RiskScoreProps) {
         <BarRow label="Low" count={counts.low} max={maxCount} color="bg-recon-lowGreen" />
       </div>
 
-      
       {/* Radar Chart Area */}
       <div className="w-full mt-8 pt-6 border-t border-recon-borderDefault flex flex-col items-center">
          <span className="text-recon-textMuted text-[10px] uppercase tracking-widest mb-6 opacity-50">Category Radar Mapping</span>
          
-         {/* Render the actual SVG chart with mock data */}
-         <RadarChart scores={{
-           headers: 20,    // Low score pulling the shape inward
+         {/* 3. Render the SVG chart with real data or mock fallback */}
+         <RadarChart scores={realRadar || {
+           headers: 20,
            injection: 40,
            deps: 30,
-           auth: 90,       // High score pushing the shape outward
+           auth: 90,
            tls: 85
          }} />
       </div>

@@ -1,77 +1,111 @@
-
 'use client';
-
 import React from 'react';
-import VulnCard from './VulnCard';
 import ScanInput from './ScanInput';
 import RiskScoreCell from './RiskScoreCell';
+import VulnCard from './VulnCard';
 import LiveFeed from './LiveFeed';
 import ShareCell from './ShareCell';
-import RadarChart from './RadarChart';
 
-// Temporary dummy data to test the UI before we wire the FastAPI backend
-const DUMMY_RESULTS = [
-  {
-    check_name: 'Content Security Policy (CSP)',
-    severity: 'Critical' as const,
-    status: 'FAIL' as const,
-    description: 'The CSP header is missing. This leaves the application highly vulnerable to Cross-Site Scripting (XSS) and data injection.',
-    tier: 1 as const,
-  },
-  {
-    check_name: 'Reflected XSS',
-    severity: 'High' as const,
-    status: 'FAIL' as const,
-    description: 'Payload reflected in response body without sanitization. Target is vulnerable to script injection.',
-    tier: 2 as const,
-  },
-  {
-    check_name: 'Outdated Dependencies',
-    severity: 'High' as const,
-    status: 'FAIL' as const,
-    description: '4 vulnerable packages found. lodash@4.17.4 and express@4.17.0 require immediate patching.',
-    tier: 3 as const,
-  }
-];
+interface ReportData {
+  report_id: string;
+  target_url: string;
+  risk_score: number;
+  radar_scores: any;
+  vulnerabilities: any[];
+}
 
-export default function BentoGrid() {
+interface BentoGridProps {
+  reportData?: ReportData;
+  isReportView?: boolean;
+}
+
+export default function BentoGrid({ reportData, isReportView = false }: BentoGridProps) {
+  
+  // Smart Sort: Put FAILED checks at the front of the list, then slice the top 3
+  const sortedVulns = reportData?.vulnerabilities
+    ? [...reportData.vulnerabilities].sort((a, b) => {
+        if (a.passed === b.passed) return 0;
+        return a.passed ? 1 : -1; // Fails come before Passes
+      })
+    : [];
+
+  const topVulnerabilities = sortedVulns.length > 0 ? sortedVulns.slice(0, 3) : [
+    {
+      check_name: 'Content Security Policy (CSP)',
+      severity: 'Critical',
+      status: 'FAIL',
+      description: 'The CSP header is missing. This leaves the application highly vulnerable to Cross-Site Scripting (XSS) and data injection.',
+      tier: 1
+    },
+    {
+      check_name: 'Reflected XSS',
+      severity: 'High',
+      status: 'FAIL',
+      description: 'Payload reflected in response body without sanitization. Target is vulnerable to script injection.',
+      tier: 2
+    },
+    {
+      check_name: 'Outdated Dependencies',
+      severity: 'High',
+      status: 'FAIL',
+      description: '4 vulnerable packages found. lodash@4.17.4 and express@4.17.0 require immediate patching.',
+      tier: 3
+    }
+  ];
+
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 md:p-8">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-min">
-        
-        {/* ROW 1: Top Bar */}
-        <div className="col-span-1 md:col-span-4">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 pb-12">
+      
+      {/* ROW 1: Scan Input (Hidden on Report View) */}
+      {!isReportView && (
+        <div className="w-full mb-2">
           <ScanInput onScan={(url) => console.log('Scanning:', url)} />
         </div>
+      )}
 
-        {/* ROW 2: Risk Score Placeholder */}
-        <div className="col-span-1 md:row-span-2">
+      {/* ROW 2: Risk Score & Top Vulnerabilities */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        {/* Risk Score Span 1 Col */}
+        <div className="col-span-1">
           <RiskScoreCell 
-            score={42} 
-            counts={{ critical: 2, high: 3, medium: 1, low: 1 }} 
+            realScore={reportData?.risk_score} 
+            realRadar={reportData?.radar_scores} 
+            vulnerabilities={reportData?.vulnerabilities}
           />
         </div>
 
-        {/* ROW 2: Vulnerability Cards */}
-        <div className="col-span-1">
-          <VulnCard result={DUMMY_RESULTS[0]} />
+        {/* Vuln Cards Span 3 Cols */}
+        <div className="col-span-1 lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {topVulnerabilities.map((vuln: any, idx: number) => (
+            <div key={idx} className="h-full">
+              <VulnCard result={{
+                check_name: vuln.vulnerability_name || vuln.check_name,
+                severity: vuln.passed ? 'Pass' : vuln.severity,
+                status: vuln.passed ? 'PASS' : 'FAIL',
+                description: vuln.description,
+                tier: vuln.tier || 2
+              }} />
+            </div>
+          ))}
         </div>
-        <div className="col-span-1">
-          <VulnCard result={DUMMY_RESULTS[1]} />
-        </div>
-        <div className="col-span-1">
-          <VulnCard result={DUMMY_RESULTS[2]} />
-        </div>
-
-        {/* ROW 3: Live Feed & Share Report Placeholders */}
-        <div className="col-span-1 md:col-span-2">
-          <LiveFeed />
-        </div>
-        <div className="col-span-1">
-          <ShareCell />
-        </div>
-
       </div>
+
+      {/* ROW 3: Live Feed & Share Options */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        {/* Live Feed Span 3 Cols */}
+        {/* Giving it a min-height so the scrollable area looks good */}
+        <div className="col-span-1 lg:col-span-3 min-h-[450px]">
+          <LiveFeed isReportView={isReportView} results={reportData?.vulnerabilities} />
+        </div>
+
+        {/* Share Report Span 1 Col */}
+        <div className="col-span-1">
+          <ShareCell reportId={reportData?.report_id} />
+        </div>
+      </div>
+
     </div>
   );
 }
