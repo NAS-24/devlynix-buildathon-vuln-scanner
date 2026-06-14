@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 
 interface CategoryScores {
@@ -9,7 +10,6 @@ interface CategoryScores {
 }
 
 export default function RadarChart({ scores }: { scores: CategoryScores }) {
-  // Map our 5 categories to angles (starting top, going clockwise)
   const categories = [
     { label: 'Headers', score: scores.headers },
     { label: 'Injection', score: scores.injection },
@@ -18,11 +18,11 @@ export default function RadarChart({ scores }: { scores: CategoryScores }) {
     { label: 'TLS', score: scores.tls },
   ];
 
-  const size = 160;
+  // INCREASED SIZE from 160 to 220 for a much larger visual footprint
+  const size = 220; 
   const center = size / 2;
-  const radius = 50;
+  const radius = 70; // Increased radius for more detail
 
-  // Helper to convert polar coordinates to Cartesian for the SVG
   const getPoint = (value: number, index: number, total: number) => {
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
     const r = (value / 100) * radius;
@@ -31,19 +31,16 @@ export default function RadarChart({ scores }: { scores: CategoryScores }) {
     return `${x},${y}`;
   };
 
-  // Generate the outer web (100% boundary)
   const outerPolygon = categories.map((_, i) => getPoint(100, i, 5)).join(' ');
-  // Generate the inner web (50% boundary)
   const midPolygon = categories.map((_, i) => getPoint(50, i, 5)).join(' ');
-  // Generate the actual data shape
   const dataPolygon = categories.map((cat, i) => getPoint(cat.score, i, 5)).join(' ');
 
   return (
-    <div className="relative w-full flex justify-center items-center">
+    <div className="relative w-full flex justify-center items-center py-4">
       <svg width={size} height={size} className="overflow-visible">
-        {/* Background Webs */}
-        <polygon points={outerPolygon} fill="none" stroke="#2A2A2A" strokeWidth="1" />
-        <polygon points={midPolygon} fill="none" stroke="#2A2A2A" strokeWidth="0.5" strokeDasharray="2 2" />
+        {/* Background Webs: Darker borders for higher contrast */}
+        <polygon points={outerPolygon} fill="#111111" stroke="#333333" strokeWidth="2" />
+        <polygon points={midPolygon} fill="none" stroke="#222222" strokeWidth="1" strokeDasharray="4 4" />
         
         {/* Spokes */}
         {categories.map((_, i) => (
@@ -52,22 +49,21 @@ export default function RadarChart({ scores }: { scores: CategoryScores }) {
             x1={center} y1={center} 
             x2={getPoint(100, i, 5).split(',')[0]} 
             y2={getPoint(100, i, 5).split(',')[1]} 
-            stroke="#2A2A2A" strokeWidth="1" 
+            stroke="#333333" strokeWidth="2" 
           />
         ))}
 
-        {/* Data Shape */}
+        {/* Data Shape: Brighter Green with a glow filter effect */}
         <polygon 
           points={dataPolygon} 
-          fill="#1A6B3A" fillOpacity="0.2" 
-          stroke="#1A6B3A" strokeWidth="1.5" 
+          fill="#10b981" fillOpacity="0.3" 
+          stroke="#10b981" strokeWidth="3" 
           className="transition-all duration-1000 ease-out"
         />
 
-        {/* Axis Labels */}
+        {/* Axis Labels: BOLD white text */}
         {categories.map((cat, i) => {
-          // Push labels slightly further out than the 100% boundary
-          const labelPoint = getPoint(135, i, 5).split(',');
+          const labelPoint = getPoint(125, i, 5).split(',');
           return (
             <text
               key={`label-${i}`}
@@ -75,7 +71,7 @@ export default function RadarChart({ scores }: { scores: CategoryScores }) {
               y={labelPoint[1]}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="fill-recon-textHint text-[9px] uppercase tracking-widest"
+              className="fill-white font-black text-[10px] uppercase tracking-[0.2em]"
             >
               {cat.label}
             </text>

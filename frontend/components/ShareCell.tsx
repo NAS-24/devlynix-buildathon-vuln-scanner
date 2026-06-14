@@ -1,117 +1,94 @@
 'use client';
 import React, { useState } from 'react';
-import { Copy, FileText, Code, CheckCircle, ExternalLink } from 'lucide-react';
+
+interface ScanHistoryItem {
+  url: string;
+  score: number;
+}
 
 interface ShareCellProps {
   reportId?: string;
+  history?: ScanHistoryItem[];
 }
 
-// Mock local storage data for the UI checkpoint
-const MOCK_HISTORY = [
-  { url: 'https://example-app.com', score: 42 },
-  { url: 'https://demo.mysite.io', score: 88 },
-  { url: 'github.com/user/proj', score: 61 }
-];
-
-export default function ShareCell({ reportId }: ShareCellProps) {
+export default function ShareCell({ reportId, history = [] }: ShareCellProps) {
   const [copied, setCopied] = useState(false);
-  const [showHistory, setShowHistory] = useState(true); // Default to open so judges see it immediately
   
-  // Use the real reportId if passed down, otherwise fallback
-  const displayId = reportId || 'k7xBp2nQ';
+  
+  const displayId = reportId || '...'; 
+  const isReady = !!reportId;
 
   const handleCopy = () => {
-    // Dynamically construct the URL so it works locally and in production
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://recon.app';
-    navigator.clipboard.writeText(`${baseUrl}/report/${displayId}`);
-    
+    if (!reportId) return; 
+    navigator.clipboard.writeText(reportId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="h-full w-full p-6 rounded-xl bg-recon-bgCard border border-recon-borderDefault flex flex-col hover:border-recon-borderHover transition-colors relative">
+    <div className="h-full w-full p-8 rounded-xl bg-[#111111] border border-recon-borderDefault flex flex-col hover:border-[#333333] transition-colors shadow-lg">
       
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-recon-textMuted text-[10px] uppercase tracking-widest">Share Report</h2>
-      </div>
+      {/* HEADER */}
+      <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.3em] mb-8">
+        Share Report
+      </h2>
 
-      {/* Unique URL Box */}
-      <div className="flex items-center justify-between bg-recon-codeBg border border-recon-borderDefault p-3 rounded-lg mb-3">
-        <span className="text-recon-accentGreen font-mono text-xs truncate mr-2">
-          {displayId}
-        </span>
-        <button 
-          onClick={handleCopy}
-          className={`text-[10px] uppercase tracking-wider px-3 py-1 rounded transition-colors ${
-            copied ? 'bg-recon-lowGreen text-[#1A1A1A]' : 'bg-recon-bgSurface hover:bg-recon-borderDefault text-recon-textPrimary'
-          }`}
-        >
-          {copied ? 'Copied!' : 'Copy Link'}
-        </button>
-      </div>
+      {/* URL BOX */}
+        <div className="flex items-center justify-between bg-black border border-[#222222] p-4 rounded-lg mb-4">
+            <span className={`font-mono text-xs font-bold tracking-widest truncate mr-4 ${isReady ? 'text-recon-accentGreen' : 'text-gray-700'}`}>
+            {displayId}
+            </span>
+            <button 
+            onClick={handleCopy}
+            disabled={!isReady} // 2. Disable button if no report yet
+            className={`text-[9px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded transition-colors ${
+                !isReady ? 'opacity-30 cursor-not-allowed bg-[#222222] text-gray-500' :
+                copied ? 'bg-recon-lowGreen text-black' : 'bg-[#222222] hover:bg-[#333333] text-white'
+            }`}
+            >
+            {copied ? 'Copied!' : 'Copy'}
+            </button>
+        </div>
 
-      <p className="text-recon-textHint text-[10px] leading-relaxed mb-6">
+      <p className="text-gray-500 font-medium text-[11px] leading-relaxed mb-8">
         Anyone with this link can view the full report without re-scanning.
       </p>
 
-      {/* Export Buttons */}
-      <div className="flex gap-3 mb-8">
-        <button 
-          onClick={() => window.print()}
-          className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted"
-        >
-          <span className="text-lg mb-1">📄</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold">PDF</span>
+      {/* EXPORT BUTTONS */}
+      <div className="flex gap-4 mb-8">
+        <button className="flex-1 flex flex-col items-center justify-center py-4 border border-[#222222] rounded-lg hover:border-white transition-all text-gray-400 hover:text-white">
+          <span className="text-xl mb-2">📄</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.2em]">PDF</span>
         </button>
-        <button 
-          onClick={() => {
-            // Check if we are on the report page to download the actual embedded JSON
-            const dataElement = document.getElementById('report-data');
-            if (dataElement) {
-              const data = JSON.parse(dataElement.innerHTML);
-              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `recon-scan-${displayId}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }
-          }}
-          className="flex-1 flex flex-col items-center justify-center py-3 border border-recon-borderDefault rounded-lg hover:border-recon-accentGreen hover:text-recon-accentGreen transition-colors text-recon-textMuted"
-        >
-          <span className="text-lg mb-1">{`{ }`}</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold">JSON</span>
+        <button className="flex-1 flex flex-col items-center justify-center py-4 border border-[#222222] rounded-lg hover:border-white transition-all text-gray-400 hover:text-white">
+          <span className="text-xl mb-2">{`{ }`}</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.2em]">JSON</span>
         </button>
       </div>
 
-      {/* Recent Scans Micro-Dropdown */}
-      <div className="mt-auto pt-4 border-t border-recon-borderDefault">
-        <button 
-          onClick={() => setShowHistory(!showHistory)}
-          className="w-full flex justify-between items-center text-recon-textMuted text-[10px] uppercase tracking-widest hover:text-recon-textPrimary transition-colors mb-3"
-        >
+      {/* DYNAMIC RECENT SCANS */}
+      <div className="mt-auto pt-6 border-t border-[#222222]">
+        <h3 className="text-white font-bold text-[9px] uppercase tracking-[0.2em] mb-4 opacity-60">
           Recent Scans
-          <span>{showHistory ? '▲' : '▼'}</span>
-        </button>
+        </h3>
         
-        {showHistory && (
-          <div className="flex flex-col gap-2">
-            {MOCK_HISTORY.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center p-2 rounded hover:bg-recon-bgSurface cursor-pointer transition-colors">
-                <span className="text-recon-textMuted text-xs truncate max-w-[150px]">{item.url}</span>
-                <span className={`text-xs font-mono font-bold ${
+        <div className="flex flex-col gap-3">
+          {history.length > 0 ? (
+            history.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center p-2 rounded hover:bg-[#1a1a1a] transition-colors cursor-pointer">
+                <span className="text-gray-300 text-[11px] font-medium truncate max-w-[140px]">{item.url}</span>
+                <span className={`text-[11px] font-black font-mono ${
                   item.score >= 80 ? 'text-recon-lowGreen' : item.score >= 40 ? 'text-recon-highOrange' : 'text-recon-critRed'
                 }`}>
                   {item.score}
                 </span>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          ) : (
+            <span className="text-[10px] text-gray-600 italic">No recent scans yet.</span>
+          )}
+        </div>
       </div>
-
     </div>
   );
 }

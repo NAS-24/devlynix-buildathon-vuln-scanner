@@ -4,10 +4,11 @@ import SeverityBadge from './SeverityBadge';
 import TierBadge from './TierBadge';
 import SolvePanel from './SolvePanel';
 
+// 1. Updated Interface to support the 'WAITING' state
 interface ScanResult {
   check_name: string;
-  severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Pass';
-  status: 'PASS' | 'FAIL' | 'WARNING';
+  severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Pass' | 'Info';
+  status: 'PASS' | 'FAIL' | 'WARNING' | 'WAITING';
   description: string;
   tier: 1 | 2 | 3;
 }
@@ -18,16 +19,14 @@ export default function VulnCard({ result: initialResult }: { result: ScanResult
   const [result, setResult] = useState(initialResult);
   const [flash, setFlash] = useState(false);
 
-  // Left border accent colors
-  const borderColors = {
-    Critical: 'border-l-recon-critRed',
-    High: 'border-l-recon-highOrange',
-    Medium: 'border-l-recon-medYellow',
-    Low: 'border-l-recon-lowGreen',
-    Pass: 'border-l-recon-lowGreen',
+  // Status color mapping for the new bold look
+  const statusColors = {
+    PASS: 'text-recon-lowGreen',
+    FAIL: 'text-recon-critRed',
+    WARNING: 'text-recon-highOrange',
+    WAITING: 'text-recon-textMuted'
   };
 
-  // Mock the Re-check loop (Blueprint Section 5.5)
   const handleRecheck = () => {
     setIsChecking(true);
     setTimeout(() => {
@@ -35,37 +34,39 @@ export default function VulnCard({ result: initialResult }: { result: ScanResult
       setIsOpen(false);
       setResult({ ...result, status: 'PASS', severity: 'Pass' });
       setFlash(true);
-      setTimeout(() => setFlash(false), 800); // Remove flash class after animation
+      setTimeout(() => setFlash(false), 800);
     }, 1500);
   };
 
   return (
     <div
-      onClick={() => setIsOpen(true)}
-      className={`relative h-full min-h-[180px] p-5 rounded-xl border border-recon-borderDefault hover:border-recon-borderHover cursor-pointer overflow-hidden border-l-[3px] transition-all duration-300 ${borderColors[result.severity]} ${
-        flash ? 'bg-[#1E3A1E]' : 'bg-recon-bgCard hover:bg-[#1E2A20]'
-      }`}
+      onClick={() => result.status !== 'WAITING' && setIsOpen(true)}
+      className={`relative h-full p-6 rounded-xl border border-recon-borderDefault bg-[#111111] flex flex-col transition-all duration-300 shadow-lg ${
+        result.status !== 'WAITING' ? 'hover:border-[#333333] cursor-pointer' : 'opacity-80'
+      } ${flash ? 'bg-[#1E3A1E]' : ''}`}
     >
-      {/* Top Row */}
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-recon-textPrimary font-medium text-[14px] leading-tight pr-2">{result.check_name}</h3>
+      {/* Top Row: Title & Tier */}
+      <div className="flex justify-between items-start mb-5 gap-3">
+        <h3 className="text-white font-bold text-xl leading-snug tracking-tight">
+          {result.check_name}
+        </h3>
         <TierBadge tier={result.tier} />
       </div>
 
-      {/* Middle Row */}
-      <div className="flex justify-between items-center mb-3">
-        <span className={`font-mono text-sm font-semibold tracking-wider ${result.status === 'PASS' ? 'text-recon-lowGreen' : 'text-recon-critRed'}`}>
+      {/* Middle Row: Status & Severity */}
+      <div className="flex justify-between items-center mb-5 pb-4 border-b border-[#222222]">
+        <span className={`font-black text-[11px] tracking-[0.2em] uppercase ${statusColors[result.status]}`}>
           {result.status}
         </span>
         <SeverityBadge severity={result.severity} />
       </div>
 
-      {/* Bottom Row */}
-      <p className="text-recon-textMuted text-[11px] leading-relaxed line-clamp-3">
+      {/* Bottom Row: Description */}
+      <p className="text-gray-300 font-medium text-sm leading-relaxed mt-auto">
         {result.description}
       </p>
 
-      {/* The Solve System Overlay */}
+      {/* Solve System Overlay */}
       {isOpen && (
         <SolvePanel 
           checkName={result.check_name}

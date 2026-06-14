@@ -10,7 +10,7 @@ interface RiskScoreProps {
 }
 
 export default function RiskScoreCell({ realScore, realRadar, vulnerabilities = [] }: RiskScoreProps) {
-  const score = realScore !== undefined ? realScore : 42;
+  const score = realScore !== undefined ? realScore : 100;
   
   // Dynamically count the severities of ONLY the failed checks
   const counts = vulnerabilities.reduce((acc, vuln) => {
@@ -35,23 +35,28 @@ export default function RiskScoreCell({ realScore, realRadar, vulnerabilities = 
     statusText = 'AT RISK';
   }
 
-  // Find the highest count to scale the bars properly
   const maxCount = Math.max(counts.critical, counts.high, counts.medium, counts.low, 1);
 
   return (
-    <div className="h-full w-full p-6 rounded-xl bg-recon-bgCard border border-recon-borderDefault flex flex-col items-center relative overflow-hidden transition-colors hover:border-recon-borderHover">
-      <h2 className="text-recon-textMuted text-[10px] uppercase tracking-widest w-full text-left mb-8">Risk Score</h2>
+    <div className="h-full w-full p-8 rounded-xl bg-[#111111] border border-recon-borderDefault flex flex-col items-center relative overflow-hidden transition-colors shadow-lg">
+      
+      {/* BOLDER HEADER */}
+      <h2 className="text-white font-black text-[10px] uppercase tracking-[0.3em] w-full text-left mb-8">
+        Risk Score
+      </h2>
 
       {/* Circular Score Ring */}
-      <div className={`w-32 h-32 rounded-full border-[4px] ${ringColor} flex flex-col items-center justify-center mb-4 shadow-[0_0_20px_rgba(0,0,0,0.2)]`}>
-        <span className="text-4xl font-medium text-recon-textPrimary">{score}</span>
-        <span className="text-[10px] text-recon-textHint mt-1">/ 100</span>
+      <div className={`w-36 h-36 rounded-full border-[4px] ${ringColor} flex flex-col items-center justify-center mb-4 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20`}>
+        <span className="text-5xl font-bold text-white">{score}</span>
+        <span className="text-[11px] font-bold text-recon-textHint mt-1 tracking-widest">/ 100</span>
       </div>
 
-      <span className={`text-sm font-bold tracking-wider mb-10 uppercase ${textColor}`}>
+      {/* MASSIVE STATUS TEXT */}
+      <span className={`text-lg font-black tracking-[0.25em] mb-10 uppercase ${textColor}`}>
         {statusText}
       </span>
 
+      {/* SEVERITY BARS */}
       <div className="w-full flex flex-col gap-4 mt-auto z-10">
         <BarRow label="Critical" count={counts.critical} max={maxCount} color="bg-recon-critRed" />
         <BarRow label="High" count={counts.high} max={maxCount} color="bg-recon-highOrange" />
@@ -60,37 +65,30 @@ export default function RiskScoreCell({ realScore, realRadar, vulnerabilities = 
       </div>
 
       {/* Radar Chart Area */}
-      <div className="w-full mt-8 pt-6 border-t border-recon-borderDefault flex flex-col items-center">
-         <span className="text-recon-textMuted text-[10px] uppercase tracking-widest mb-6 opacity-50">Category Radar Mapping</span>
-         
-         {/* 3. Render the SVG chart with real data or mock fallback */}
-         <RadarChart scores={realRadar || {
-           headers: 20,
-           injection: 40,
-           deps: 30,
-           auth: 90,
-           tls: 85
-         }} />
-      </div>
+        {realRadar ? (
+        <RadarChart scores={realRadar} />
+        ) : (
+        <div className="h-[220px] w-[220px] flex items-center justify-center text-[10px] text-gray-600 italic">
+            Awaiting Scan Data...
+        </div>
+        )}
     </div>
   );
 }
 
-// Internal sub-component for the horizontal bars
 function BarRow({ label, count, max, color }: { label: string, count: number, max: number, color: string }) {
-  // Ensure the bar has at least a 5% sliver of width if the count is > 0 so it's visible
   const widthPercent = count === 0 ? 0 : Math.max(5, (count / max) * 100);
   
   return (
-    <div className="flex items-center text-xs">
-      <span className="w-16 text-recon-textMuted">{label}</span>
-      <div className="flex-1 h-1.5 bg-recon-bgSurface rounded-full overflow-hidden mx-3">
+    <div className="flex items-center text-xs font-semibold">
+      <span className="w-20 text-gray-300">{label}</span>
+      <div className="flex-1 h-2 bg-[#222222] rounded-full overflow-hidden mx-3">
         <div 
-          className={`h-full ${color} transition-all duration-1000 ease-out`} 
+          className={`h-full ${color} transition-all duration-1000 ease-out shadow-[0_0_8px_currentColor]`} 
           style={{ width: `${widthPercent}%` }}
         ></div>
       </div>
-      <span className="w-4 text-right text-recon-textPrimary font-mono">{count}</span>
+      <span className="w-6 text-right text-white font-mono font-bold">{count}</span>
     </div>
   );
 }
