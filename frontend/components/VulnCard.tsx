@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import SeverityBadge from './SeverityBadge';
 import TierBadge from './TierBadge';
-
+import SolvePanel from './SolvePanel';
 
 interface ScanResult {
   check_name: string;
@@ -12,10 +12,13 @@ interface ScanResult {
   tier: 1 | 2 | 3;
 }
 
-export default function VulnCard({ result }: { result: ScanResult }) {
+export default function VulnCard({ result: initialResult }: { result: ScanResult }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [result, setResult] = useState(initialResult);
+  const [flash, setFlash] = useState(false);
 
-  
+  // Left border accent colors
   const borderColors = {
     Critical: 'border-l-recon-critRed',
     High: 'border-l-recon-highOrange',
@@ -24,14 +27,28 @@ export default function VulnCard({ result }: { result: ScanResult }) {
     Pass: 'border-l-recon-lowGreen',
   };
 
+  // Mock the Re-check loop (Blueprint Section 5.5)
+  const handleRecheck = () => {
+    setIsChecking(true);
+    setTimeout(() => {
+      setIsChecking(false);
+      setIsOpen(false);
+      setResult({ ...result, status: 'PASS', severity: 'Pass' });
+      setFlash(true);
+      setTimeout(() => setFlash(false), 800); // Remove flash class after animation
+    }, 1500);
+  };
+
   return (
     <div
       onClick={() => setIsOpen(true)}
-      className={`relative h-full min-h-[180px] p-5 rounded-xl bg-recon-bgCard border border-recon-borderDefault hover:border-recon-borderHover hover:bg-[#1E2A20] transition-all duration-200 cursor-pointer overflow-hidden border-l-[3px] ${borderColors[result.severity]}`}
+      className={`relative h-full min-h-[180px] p-5 rounded-xl border border-recon-borderDefault hover:border-recon-borderHover cursor-pointer overflow-hidden border-l-[3px] transition-all duration-300 ${borderColors[result.severity]} ${
+        flash ? 'bg-[#1E3A1E]' : 'bg-recon-bgCard hover:bg-[#1E2A20]'
+      }`}
     >
       {/* Top Row */}
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-recon-textPrimary font-medium text-[15px]">{result.check_name}</h3>
+        <h3 className="text-recon-textPrimary font-medium text-[14px] leading-tight pr-2">{result.check_name}</h3>
         <TierBadge tier={result.tier} />
       </div>
 
@@ -44,34 +61,19 @@ export default function VulnCard({ result }: { result: ScanResult }) {
       </div>
 
       {/* Bottom Row */}
-      <p className="text-recon-textMuted text-xs leading-relaxed line-clamp-3">
+      <p className="text-recon-textMuted text-[11px] leading-relaxed line-clamp-3">
         {result.description}
       </p>
 
-      {/* Detail Panel Overlay (The "Solve" System) */}
+      {/* The Solve System Overlay */}
       {isOpen && (
-        <div
-          className="absolute inset-0 z-10 bg-[#1A2A1E] border border-recon-accentGreen p-5 flex flex-col cursor-default"
-          onClick={(e) => e.stopPropagation()} // Prevent clicks from bleeding through
-        >
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="text-recon-textPrimary font-medium text-[15px]">{result.check_name}</h3>
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
-              className="text-recon-textMuted hover:text-recon-textPrimary transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-          
-          <p className="text-xs text-recon-textMuted mb-auto leading-relaxed">
-            Detailed explanation and OWASP references will appear here. The Solve modes (Guide Me / Direct Me / Fix It For Me) are coming next.
-          </p>
-
-          <button className="mt-4 w-full bg-recon-accentGreen text-white text-xs font-bold tracking-widest uppercase py-3 rounded uppercase hover:bg-recon-accentGreenLight transition-colors flex items-center justify-center gap-2">
-            <span>🔧</span> SOLVE THIS
-          </button>
-        </div>
+        <SolvePanel 
+          checkName={result.check_name}
+          description={result.description}
+          onClose={() => setIsOpen(false)}
+          onRecheck={handleRecheck}
+          isChecking={isChecking}
+        />
       )}
     </div>
   );

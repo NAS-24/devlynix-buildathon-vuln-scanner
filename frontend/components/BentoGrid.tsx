@@ -5,6 +5,9 @@ import React from 'react';
 import VulnCard from './VulnCard';
 import ScanInput from './ScanInput';
 import RiskScoreCell from './RiskScoreCell';
+import LiveFeed from './LiveFeed';
+import ShareCell from './ShareCell';
+import RadarChart from './RadarChart';
 
 // Temporary dummy data to test the UI before we wire the FastAPI backend
 const DUMMY_RESULTS = [
@@ -61,11 +64,11 @@ export default function BentoGrid() {
         </div>
 
         {/* ROW 3: Live Feed & Share Report Placeholders */}
-        <div className="col-span-1 md:col-span-2 min-h-[200px] border border-dashed border-recon-borderDefault rounded-xl bg-recon-bgCard/30 flex items-center justify-center">
-          <span className="text-recon-textMuted font-mono text-sm">[ LiveFeed Stream ]</span>
+        <div className="col-span-1 md:col-span-2">
+          <LiveFeed />
         </div>
-        <div className="col-span-1 min-h-[200px] border border-dashed border-recon-borderDefault rounded-xl bg-recon-bgCard/30 flex items-center justify-center">
-          <span className="text-recon-textMuted font-mono text-sm">[ Share Report ]</span>
+        <div className="col-span-1">
+          <ShareCell />
         </div>
 
       </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import RadarChart from './RadarChart';
 
 interface RiskScoreProps {
   score: number;
@@ -53,11 +54,18 @@ export default function RiskScoreCell({ score, counts }: RiskScoreProps) {
       </div>
 
       
+      {/* Radar Chart Area */}
       <div className="w-full mt-8 pt-6 border-t border-recon-borderDefault flex flex-col items-center">
-         <span className="text-recon-textMuted text-[10px] uppercase tracking-widest mb-4 opacity-50">Category Radar Mapping</span>
-         <div className="w-24 h-24 border border-dashed border-recon-borderDefault rounded-full flex items-center justify-center opacity-30">
-            <span className="text-recon-textHint text-[10px] text-center">SVG<br/>Radar</span>
-         </div>
+         <span className="text-recon-textMuted text-[10px] uppercase tracking-widest mb-6 opacity-50">Category Radar Mapping</span>
+         
+         {/* Render the actual SVG chart with mock data */}
+         <RadarChart scores={{
+           headers: 20,    // Low score pulling the shape inward
+           injection: 40,
+           deps: 30,
+           auth: 90,       // High score pushing the shape outward
+           tls: 85
+         }} />
       </div>
     </div>
   );
