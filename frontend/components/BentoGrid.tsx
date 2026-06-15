@@ -142,11 +142,11 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
 
       {/* 4. HIDDEN FROM PDF (You don't want the download buttons inside the downloaded PDF): */}
       <div data-html2canvas-ignore className="w-full">
-        <ShareCell 
-          reportId={finishedReportId} 
-          results={liveVulns} 
-          targetUrl={currentUrl}
+        <ShareCell
+          reportId={finishedReportId}
+          results={liveVulns}
           score={liveScore}
+          targetUrl={currentUrl}
         />
       </div>
     </div>

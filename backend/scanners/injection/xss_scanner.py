@@ -5,11 +5,7 @@ from engine.base_scanner import BaseScanner
 from models.scan_result import ScanResult, SeverityLevel
 
 XSS_PAYLOAD = "<script>xssrecon</script>"
-XSS_PAYLOAD_LOWER = xss_payload_lower = XSS_PAYLOAD.lower()
-XSS_ENCODED = "&lt;script&gt;xssrecon&lt;/script&gt;"
-
 INJECTABLE_TYPES = {"text", "search", "email", "url", "tel", "number", ""}
-
 
 class XSSScanner(BaseScanner):
 
@@ -22,19 +18,32 @@ class XSSScanner(BaseScanner):
             ) as client:
 
                 response = await client.get(target_url)
+                
+                # 1. WAF & Anti-Bot Awareness
+                if response.status_code in [403, 406, 429, 503]:
+                    return ScanResult(
+                        vulnerability_name="Reflected XSS",
+                        passed=True,
+                        severity=SeverityLevel.INFO,
+                        description=f"⚠️ SCAN SKIPPED — WAF or anti-bot mechanism intercepted the request (Status: {response.status_code}).",
+                        remediation="Ensure the target URL is publicly accessible or whitelist the scanner's IP."
+                    )
+
                 soup = BeautifulSoup(response.text, "html.parser")
 
+                # Test URL Parameters
                 url_result = await self._test_url_params(client, target_url)
                 if url_result:
                     return self._build_fail_result(url_result)
 
+                # Test HTML Forms
                 forms = soup.find_all("form")
-
                 for form in forms:
                     form_result = await self._test_form(client, target_url, form)
                     if form_result:
                         return self._build_fail_result(form_result)
 
+                # ── PASS ──────────────
                 return ScanResult(
                     vulnerability_name="Reflected XSS",
                     passed=True,
@@ -52,13 +61,14 @@ class XSSScanner(BaseScanner):
                     )
                 )
 
-        except httpx.RequestError as e:
+        except Exception as e:
+            # Broadened exception catch to prevent stream crashes
             return ScanResult(
                 vulnerability_name="Reflected XSS",
                 passed=True,
                 severity=SeverityLevel.INFO,
-                description=f"SCAN SKIPPED — could not reach target: {str(e)[:80]}",
-                remediation="Ensure the target URL is publicly accessible."
+                description=f"⚠️ SCAN SKIPPED — could not complete scan: {str(e)[:80]}",
+                remediation="Ensure the target URL is publicly accessible and stable."
             )
 
     async def _test_url_params(
@@ -82,10 +92,9 @@ class XSSScanner(BaseScanner):
                 if hit:
                     return {
                         "location": f"URL parameter '{param_name}'",
-                        "evidence": f"GET {injected_url}",
-                        "encoded":  hit == "encoded",
+                        "evidence": f"GET {injected_url}"
                     }
-            except httpx.RequestError:
+            except Exception:
                 continue
 
         return None
@@ -124,20 +133,20 @@ class XSSScanner(BaseScanner):
             if hit:
                 return {
                     "location": f"form input at {form_url}",
-                    "evidence": f"{method.upper()} {form_url}",
-                    "encoded":  hit == "encoded",
+                    "evidence": f"{method.upper()} {form_url}"
                 }
-        except httpx.RequestError:
+        except Exception:
             pass
 
         return None
 
-    def _check_response(self, response_text: str) -> str | None:
+    def _check_response(self, response_text: str) -> bool:
+        # 2. FALSE POSITIVE FIX: 
+        # Only return True if the raw, dangerous tags are reflected. 
+        # If the server safely converted it to &lt;script&gt;, it is NOT vulnerable!
         if XSS_PAYLOAD in response_text:
-            return "reflected"
-        if XSS_ENCODED in response_text.lower():
-            return "encoded"
-        return None
+            return True
+        return False
 
     def _build_fail_result(self, finding: dict) -> ScanResult:
         return ScanResult(

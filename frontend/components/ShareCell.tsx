@@ -10,11 +10,10 @@ interface ScanHistoryItem {
 export default function ShareCell({ reportId, results = [] }: any) {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
-  const [origin, setOrigin] = useState<string | null>(null); // Hydration fix
+  const [origin, setOrigin] = useState<string | null>(null);
   
   const isReady = !!reportId;
 
-  // Hydration Fix: Only access window.location.origin after initial client mount
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
@@ -48,75 +47,11 @@ export default function ShareCell({ reportId, results = [] }: any) {
     a.click();
   };
 
-  const handlePdfExport = async () => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      const element = document.getElementById('recon-dashboard');
-      if (!element) return;
-
-      const opt = {
-        margin:       0.3,
-        filename:     `recon-audit-${reportId || 'latest'}.pdf`,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: '#0a0a0a', 
-          windowWidth: 1200, 
-          onclone: (clonedDoc: Document) => {
-            const elements = clonedDoc.querySelectorAll('*');
-            
-            // List of every property html2canvas might try to parse as a color
-            const colorProps = [
-              'color', 'backgroundColor', 'borderColor', 'borderTopColor', 
-              'borderRightColor', 'borderBottomColor', 'borderLeftColor', 
-              'fill', 'stroke', 'outlineColor', 'textDecorationColor'
-            ];
-
-            elements.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              
-              // Kill all shadows completely
-              htmlEl.style.boxShadow = 'none';
-              htmlEl.style.textShadow = 'none';
-              
-              // Inspect all color properties and overwrite any lab/oklab values
-              const computedStyle = window.getComputedStyle(htmlEl);
-              colorProps.forEach((prop) => {
-                // @ts-ignore - dynamic style access
-                const val = computedStyle[prop];
-                if (val && (val.includes('lab') || val.includes('oklab'))) {
-                  if (prop === 'backgroundColor' || prop === 'fill') {
-                    // @ts-ignore
-                    htmlEl.style[prop] = '#111111'; // Safe dark background
-                  } else if (prop === 'color' || prop === 'stroke') {
-                    // @ts-ignore
-                    htmlEl.style[prop] = '#ffffff'; // Safe white text/icons
-                  } else {
-                    // @ts-ignore
-                    htmlEl.style[prop] = '#333333'; // Safe dark border
-                  }
-                }
-              });
-            });
-          }
-        },
-        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' as const }
-      };
-
-      html2pdf().set(opt).from(element).save();
-    } catch (err) {
-      console.error("PDF Export failed: ", err);
-    }
-  };
-
   return (
-    <div className="w-full p-8 rounded-xl bg-[#111111] border border-[#222222] shadow-lg">
+    // We add a specific 'print:hidden' class here so the download box doesn't show up in the PDF
+    <div className="w-full p-8 rounded-xl bg-[#111111] border border-[#222222] shadow-lg print:hidden">
       <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.3em] mb-6">Share Report</h2>
       
-      {/* URL box */}
       <div className="flex items-center justify-between bg-black border border-[#222222] p-4 rounded-lg mb-6">
         <span className={`font-mono text-xs font-bold tracking-widest truncate mr-4 ${isReady ? 'text-recon-accentGreen' : 'text-gray-700'}`}>
           {shareUrl ?? 'Scan a target to generate a report link'}
@@ -126,9 +61,9 @@ export default function ShareCell({ reportId, results = [] }: any) {
         </button>
       </div>
 
-      {/* Export buttons */}
       <div className="flex gap-4 mb-8">
-        <button onClick={handlePdfExport} className="flex-1 py-4 border border-[#222222] rounded-lg hover:border-white text-gray-400 hover:text-white transition-all text-[9px] font-black uppercase cursor-pointer">
+        {/* Reverted back to the native window.print() */}
+        <button onClick={() => window.print()} className="flex-1 py-4 border border-[#222222] rounded-lg hover:border-white text-gray-400 hover:text-white transition-all text-[9px] font-black uppercase cursor-pointer">
           PDF
         </button>
         <button onClick={handleJsonExport} disabled={!results.length} className="flex-1 py-4 border border-[#222222] rounded-lg hover:border-white text-gray-400 hover:text-white transition-all text-[9px] font-black uppercase disabled:opacity-30 disabled:cursor-not-allowed">
@@ -136,7 +71,6 @@ export default function ShareCell({ reportId, results = [] }: any) {
         </button>
       </div>
 
-      {/* Persistent History from MongoDB */}
       <div className="pt-6 border-t border-[#222222]">
         <h3 className="text-white font-bold text-[9px] uppercase mb-4 opacity-60">Recent Scans</h3>
         <div className="flex flex-col gap-2">

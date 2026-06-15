@@ -5,7 +5,6 @@ from engine.base_scanner import BaseScanner
 from models.scan_result import ScanResult, SeverityLevel
 
 SENSITIVE_PATHS = [
-
     {
         "path": "/.env",
         "name": ".env File",
@@ -58,8 +57,6 @@ SENSITIVE_PATHS = [
         "why": "WordPress config with database name, username, password, and auth keys.",
         "keywords": ["DB_NAME", "DB_USER", "DB_PASSWORD", "AUTH_KEY"],
     },
-
-   
     {
         "path": "/admin",
         "name": "Admin Panel",
@@ -98,8 +95,6 @@ SENSITIVE_PATHS = [
         "why": "Debug page may expose stack traces, environment variables, or internal routes.",
         "keywords": ["DEBUG", "Traceback", "stack trace"],
     },
-
-    
     {
         "path": "/backup",
         "name": "Backup Directory",
@@ -131,16 +126,6 @@ SENSITIVE_PATHS = [
         "keywords": ["apiKey", "secret", "password", "token"],
     },
     {
-        "path": "/robots.txt",
-        "name": "robots.txt (Information Disclosure)",
-        "severity": SeverityLevel.MEDIUM,
-        "why": (
-            "robots.txt reveals hidden paths the developer didn't want indexed "
-            "— admin panels, API routes, staging areas."
-        ),
-        "keywords": ["Disallow:", "User-agent:"],
-    },
-    {
         "path": "/.DS_Store",
         "name": ".DS_Store File",
         "severity": SeverityLevel.MEDIUM,
@@ -151,8 +136,6 @@ SENSITIVE_PATHS = [
         "keywords": [],
         "min_content_length": 8,
     },
-
-
     {
         "path": "/sitemap.xml",
         "name": "Sitemap (Enumeration Risk)",
@@ -177,7 +160,6 @@ _SEVERITY_ORDER = {
     SeverityLevel.INFO:     0,
 }
 
-
 class SensitiveFileScanner(BaseScanner):
 
     async def scan(self, target_url: str) -> ScanResult:
@@ -196,13 +178,14 @@ class SensitiveFileScanner(BaseScanner):
                 results = await asyncio.gather(*tasks)
                 all_findings = [r for r in results if r is not None]
 
-        except httpx.RequestError as e:
+        except Exception as e:
+            # Broadened catch to prevent WAF connection drops from killing the stream
             return ScanResult(
                 vulnerability_name="Sensitive File Exposure",
                 passed=True,
                 severity=SeverityLevel.INFO,
                 description=f"⚠️ SCAN SKIPPED — could not reach target: {str(e)[:80]}",
-                remediation="Ensure the target URL is publicly accessible."
+                remediation="Ensure the target URL is publicly accessible and not blocking automated scanners."
             )
 
         if not all_findings:
@@ -257,7 +240,8 @@ class SensitiveFileScanner(BaseScanner):
 
         try:
             resp = await client.get(url)
-        except httpx.RequestError:
+        except Exception:
+            # Catch all exceptions here so a single blocked path probe doesn't kill the gather array
             return None
 
         if resp.status_code != 200:

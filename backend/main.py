@@ -57,6 +57,32 @@ def calculate_risk_score(results: list) -> int:
     deductions = sum(SEVERITY_WEIGHTS.get(r.get("severity", "Info"), 0) for r in results if not r.get("passed", True))
     return max(0, 100 - deductions)
 
+# ADDED: Helper function to generate the radar scores your database expects
+def calculate_radar_scores(results: list) -> dict:
+    """Calculates category scores for the frontend radar chart."""
+    scores = {
+        "Headers": 100,
+        "Injection": 100,
+        "Exposure": 100,
+        "Dependencies": 100
+    }
+    
+    for r in results:
+        if not r.get("passed", True):
+            deduction = SEVERITY_WEIGHTS.get(r.get("severity", "Info"), 0)
+            vuln_name = r.get("vulnerability_name", "").lower()
+            
+            if any(x in vuln_name for x in ["csp", "hsts", "frame"]):
+                scores["Headers"] = max(0, scores["Headers"] - deduction)
+            elif any(x in vuln_name for x in ["xss", "sqli", "injection"]):
+                scores["Injection"] = max(0, scores["Injection"] - deduction)
+            elif "sensitive" in vuln_name or "exposure" in vuln_name:
+                scores["Exposure"] = max(0, scores["Exposure"] - deduction)
+            elif "cve" in vuln_name or "dependencies" in vuln_name:
+                scores["Dependencies"] = max(0, scores["Dependencies"] - deduction)
+                
+    return scores
+
 async def get_ai_analysis(vuln_name: str, description: str):
     """Fetches concise AI analysis from Groq."""
     try:
@@ -95,7 +121,8 @@ async def verify_vuln(target_url: str, vuln_name: str):
     }
 
 @app.get("/api/stream-scan")
-async def stream_scan(target_url: str, user_id: str = "anonymous"): # <-- Added user_id parameter
+# 1. Accept user_id from the frontend so history works!
+async def stream_scan(target_url: str, user_id: str = "anonymous"):
     async def event_generator():
         try:
             yield f"data: {json.dumps({'status': 'started', 'target': target_url})}\n\n"
@@ -110,14 +137,26 @@ async def stream_scan(target_url: str, user_id: str = "anonymous"): # <-- Added 
             all_results = []
 
             async def run_and_enrich(scanner):
-                res_obj = await scanner.scan(target_url)
-                res_dict = res_obj.model_dump()
-                if not res_dict.get("passed", True):
-                    res_dict["remediation"] = await get_ai_analysis(
-                        res_dict.get("vulnerability_name", "Unknown"),
-                        res_dict.get("description", "")
-                    )
-                return res_dict
+                # 2. Wrap the individual scanner in a try/except
+                try:
+                    res_obj = await scanner.scan(target_url)
+                    res_dict = res_obj.model_dump()
+                    if not res_dict.get("passed", True):
+                        res_dict["remediation"] = await get_ai_analysis(
+                            res_dict.get("vulnerability_name", "Unknown"),
+                            res_dict.get("description", "")
+                        )
+                    return res_dict
+                except Exception as e:
+                    print(f"Scanner {scanner.__class__.__name__} failed: {e}")
+                    # If it crashes, gracefully return an Info-level skip message
+                    return {
+                        "vulnerability_name": scanner.__class__.__name__,
+                        "passed": True, 
+                        "severity": "Info",
+                        "description": "Scanner skipped due to connection error or timeout.",
+                        "remediation": "N/A"
+                    }
 
             for category in ["headers", "injection", "sensitive", "deps"]:
                 for scanner in scanners[category]:
@@ -126,20 +165,18 @@ async def stream_scan(target_url: str, user_id: str = "anonymous"): # <-- Added 
                     yield f"data: {json.dumps({'status': 'progress', 'result': res})}\n\n"
                     await asyncio.sleep(0.2)
 
-            # --- THE FIX IS HERE ---
+            # 3. ADDED radar_scores so database.py doesn't crash!
             report_id = await save_scan_result(
                 target_url=target_url,
                 risk_score=calculate_risk_score(all_results),
-                radar_scores={}, # <-- FIX 1: Added missing required parameter
+                radar_scores=calculate_radar_scores(all_results),
                 vulnerabilities=all_results,
-                user_id=user_id  # <-- FIX 2: Replaced hardcoded "anonymous"
+                user_id=user_id
             )
-            
             yield f"data: {json.dumps({'status': 'complete', 'report_id': report_id})}\n\n"
 
         except Exception as e:
-            # Print the error to your terminal so you can see if it fails again
-            print(f"Scan Stream Error: {str(e)}") 
+            print(f"Fatal stream error: {e}")
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

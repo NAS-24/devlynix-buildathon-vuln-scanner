@@ -34,3 +34,41 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-recon-accentGreen);
 }
+
+@media print {
+  /* 1. Force Landscape A4 and clean margins */
+  @page {
+    size: A4 landscape;
+    margin: 15mm; 
+  }
+
+  /* 2. Force Dark Mode */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: #0A0A0A !important; 
+    color: #ffffff !important;
+  }
+
+  /* 3. Hide interactive UI elements from the document */
+  nav, header, input, button, .animate-pulse, .print\:hidden {
+    display: none !important;
+  }
+
+  /* 4. Let scrollable boxes expand fully so no text is hidden */
+  .overflow-y-auto {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* 5. Ensure cards don't slice in half across pages */
+  .break-inside-avoid, .rounded-lg {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 6. Remove shadows to make the PDF look flat and professional */
+  * {
+    box-shadow: none !important;
+  }
+}

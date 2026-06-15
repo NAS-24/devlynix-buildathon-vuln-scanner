@@ -10,41 +10,46 @@ class CVEScanner(BaseScanner):
         Extracts package.json from a GitHub repository and checks OSV.dev for known CVEs.
         """
         try:
-            # 1. Parse the GitHub URL to build the Raw Content URL
+            
             parsed_url = urlparse(target_url)
             path_parts = [p for p in parsed_url.path.split('/') if p]
             
             if len(path_parts) < 2:
                 return ScanResult(
                     vulnerability_name="Outdated Dependencies (CVEs)",
-                    passed=False,
+                    passed=True,  # FIXED: Not a vulnerability, just an invalid target type
                     severity=SeverityLevel.INFO,
-                    description="Invalid GitHub repository URL format.",
-                    remediation="Provide a valid repository link (e.g., https://github.com/user/repo)."
+                    description="Target is not a recognized GitHub repository format. CVE scan skipped.",
+                    remediation=None
                 )
 
             owner, repo = path_parts[0], path_parts[1]
-            # Try 'main' branch first
+          
             raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/package.json"
 
-            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=15.0, 
+                follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (ReconScanner/1.0)"} # Added User-Agent to prevent 403s
+            ) as client:
                 response = await client.get(raw_url)
                 
-                # Fallback to 'master' branch if 'main' returns 404
+                
                 if response.status_code == 404:
                     raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/master/package.json"
                     response = await client.get(raw_url)
 
                 if response.status_code != 200:
+                    reason = "No package.json found" if response.status_code == 404 else f"GitHub blocked the request (Status {response.status_code})"
                     return ScanResult(
                         vulnerability_name="Outdated Dependencies (CVEs)",
-                        passed=False,
+                        passed=True, # FIXED: Missing file/rate limit is not a vulnerability
                         severity=SeverityLevel.INFO,
-                        description="No package.json found on the main or master branch. CVE scan skipped.",
+                        description=f"{reason}. CVE scan skipped.",
                         remediation=None
                     )
 
-                # 2. Extract Dependencies
+               
                 package_data = response.json()
                 dependencies = package_data.get("dependencies", {})
                 
@@ -57,10 +62,8 @@ class CVEScanner(BaseScanner):
                         remediation=None
                     )
 
-                # 3. Query Google OSV.dev API concurrently for all packages
+               
                 found_vulnerabilities = []
-                
-                # OSV.dev endpoint
                 osv_url = "https://api.osv.dev/v1/query"
                 
                 async def check_package(pkg_name, pkg_version):
@@ -75,23 +78,24 @@ class CVEScanner(BaseScanner):
                     }
                     try:
                         res = await client.post(osv_url, json=payload)
-                        data = res.json()
-                        if "vulns" in data:
-                            # Grab the first CVE ID found for this package
-                            cve_id = data["vulns"][0].get("id", "Unknown Vulnerability")
-                            return f"{pkg_name} ({clean_version}): {cve_id}"
+                        if res.status_code == 200:
+                            data = res.json()
+                            if "vulns" in data:
+                                # Grab the first CVE ID found for this package
+                                cve_id = data["vulns"][0].get("id", "Unknown Vulnerability")
+                                return f"{pkg_name} ({clean_version}): {cve_id}"
                     except Exception:
                         pass
                     return None
 
-                # Fire all OSV queries at once
+              
                 tasks = [check_package(name, version) for name, version in dependencies.items()]
                 results = await asyncio.gather(*tasks)
                 
-                # Filter out None values
+               
                 found_vulnerabilities = [r for r in results if r]
 
-                # 4. Return the Contract
+               
                 if found_vulnerabilities:
                     vuln_list = ", ".join(found_vulnerabilities)
                     return ScanResult(
@@ -113,8 +117,8 @@ class CVEScanner(BaseScanner):
         except Exception as e:
             return ScanResult(
                 vulnerability_name="Outdated Dependencies (CVEs)",
-                passed=False,
+                passed=True, 
                 severity=SeverityLevel.INFO,
-                description=f"CVE scan failed due to an error: {str(e)}",
+                description=f"CVE scan skipped due to an error: {str(e)[:80]}",
                 remediation="Ensure the repository is public and accessible."
             )
