@@ -1,94 +1,92 @@
 'use client';
-
 import React from 'react';
-import RadarChart from './RadarChart';
 
 interface RiskScoreProps {
   realScore?: number;
-  realRadar?: any;
   vulnerabilities?: any[];
 }
 
-export default function RiskScoreCell({ realScore, realRadar, vulnerabilities = [] }: RiskScoreProps) {
-  const score = realScore !== undefined ? realScore : 100;
-  
-  // Dynamically count the severities of ONLY the failed checks
+const getScoreStyle = (score: number, hasResults: boolean) => {
+  if (!hasResults) return { ring: 'border-[#222]', text: 'text-gray-700', status: 'READY', glow: '' };
+  if (score >= 80) return { ring: 'border-recon-lowGreen', text: 'text-recon-lowGreen', status: 'SECURE', glow: 'shadow-[0_0_20px_rgba(26,107,58,0.2)]' };
+  if (score >= 40) return { ring: 'border-recon-highOrange', text: 'text-recon-highOrange', status: 'AT RISK', glow: 'shadow-[0_0_20px_rgba(230,126,34,0.2)]' };
+  return { ring: 'border-recon-critRed', text: 'text-recon-critRed', status: 'CRITICAL', glow: 'shadow-[0_0_20px_rgba(231,76,60,0.2)]' };
+};
+
+export default function RiskScoreCell({ realScore, vulnerabilities = [] }: RiskScoreProps) {
+  const hasResults = vulnerabilities.length > 0;
+  const score = realScore ?? 100;
+  const style = getScoreStyle(score, hasResults);
+
   const counts = vulnerabilities.reduce((acc, vuln) => {
     if (!vuln.passed && vuln.severity) {
       const sev = vuln.severity.toLowerCase();
       if (acc[sev] !== undefined) acc[sev]++;
     }
     return acc;
-  }, { critical: 0, high: 0, medium: 0, low: 0, info: 0 });
+  }, { critical: 0, high: 0, medium: 0, low: 0 });
 
-  let ringColor = 'border-recon-critRed';
-  let textColor = 'text-recon-critRed';
-  let statusText = 'CRITICAL';
-
-  if (score >= 80) {
-    ringColor = 'border-recon-lowGreen';
-    textColor = 'text-recon-lowGreen';
-    statusText = 'SECURE';
-  } else if (score >= 40) {
-    ringColor = 'border-recon-highOrange';
-    textColor = 'text-recon-highOrange';
-    statusText = 'AT RISK';
-  }
-
-  const maxCount = Math.max(counts.critical, counts.high, counts.medium, counts.low, 1);
+  const totalFails = counts.critical + counts.high + counts.medium + counts.low;
 
   return (
-    <div className="h-full w-full p-8 rounded-xl bg-[#111111] border border-recon-borderDefault flex flex-col items-center relative overflow-hidden transition-colors shadow-lg">
-      
-      {/* BOLDER HEADER */}
-      <h2 className="text-white font-black text-[10px] uppercase tracking-[0.3em] w-full text-left mb-8">
-        Risk Score
+    <div className="h-full w-full p-6 rounded-xl bg-[#111111] border border-[#222222] flex flex-col shadow-2xl transition-all duration-500">
+      <h2 className="text-white/40 font-black text-[9px] uppercase tracking-[0.3em] w-full text-left mb-6">
+        Risk Assessment
       </h2>
 
-      {/* Circular Score Ring */}
-      <div className={`w-36 h-36 rounded-full border-[4px] ${ringColor} flex flex-col items-center justify-center mb-4 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-black/20`}>
-        <span className="text-5xl font-bold text-white">{score}</span>
-        <span className="text-[11px] font-bold text-recon-textHint mt-1 tracking-widest">/ 100</span>
-      </div>
-
-      {/* MASSIVE STATUS TEXT */}
-      <span className={`text-lg font-black tracking-[0.25em] mb-10 uppercase ${textColor}`}>
-        {statusText}
-      </span>
-
-      {/* SEVERITY BARS */}
-      <div className="w-full flex flex-col gap-4 mt-auto z-10">
-        <BarRow label="Critical" count={counts.critical} max={maxCount} color="bg-recon-critRed" />
-        <BarRow label="High" count={counts.high} max={maxCount} color="bg-recon-highOrange" />
-        <BarRow label="Medium" count={counts.medium} max={maxCount} color="bg-recon-medYellow" />
-        <BarRow label="Low" count={counts.low} max={maxCount} color="bg-recon-lowGreen" />
-      </div>
-
-      {/* Radar Chart Area */}
-        {realRadar ? (
-        <RadarChart scores={realRadar} />
-        ) : (
-        <div className="h-[220px] w-[220px] flex items-center justify-center text-[10px] text-gray-600 italic">
-            Awaiting Scan Data...
+      {/* Hero Gauge */}
+      <div className="flex flex-col items-center">
+        <div className={`w-28 h-28 rounded-full border-[3px] ${style.ring} ${hasResults ? style.glow : ''} flex flex-col items-center justify-center bg-black/40 transition-all duration-700`}>
+          <span className={`text-4xl font-black ${hasResults ? 'text-white' : 'text-gray-700'} tracking-tighter`}>
+            {hasResults ? score : '--'}
+          </span>
+          <span className="text-[9px] text-white/20 font-mono">/100</span>
         </div>
+        <span className={`text-[10px] font-black tracking-[0.3em] mt-3 uppercase ${style.text}`}>
+          {style.status}
+        </span>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center py-6">
+        {hasResults ? (
+          <div className="w-full flex flex-col gap-3 animate-in fade-in duration-700">
+            <SummaryRow label="Checks Run" value={vulnerabilities.length} />
+            <SummaryRow label="Issues Found" value={totalFails} highlight={totalFails > 0} />
+            <div className="w-full h-px bg-[#1e1e1e] my-2" />
+            <BarRow label="Crit" count={counts.critical} color="bg-recon-critRed" />
+            <BarRow label="High" count={counts.high} color="bg-recon-highOrange" />
+            <BarRow label="Med" count={counts.medium} color="bg-recon-medYellow" />
+            <BarRow label="Low" count={counts.low} color="bg-recon-lowGreen" />
+          </div>
+        ) : (
+          <div className="w-full flex flex-col gap-4 text-center">
+            <p className="text-[10px] text-gray-600 font-mono leading-relaxed">
+              Enter a URL above to begin the <br/> reconnaissance sequence.
+            </p>
+          </div>
         )}
+      </div>
     </div>
   );
 }
 
-function BarRow({ label, count, max, color }: { label: string, count: number, max: number, color: string }) {
-  const widthPercent = count === 0 ? 0 : Math.max(5, (count / max) * 100);
-  
+function SummaryRow({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div className="flex items-center text-xs font-semibold">
-      <span className="w-20 text-gray-300">{label}</span>
-      <div className="flex-1 h-2 bg-[#222222] rounded-full overflow-hidden mx-3">
-        <div 
-          className={`h-full ${color} transition-all duration-1000 ease-out shadow-[0_0_8px_currentColor]`} 
-          style={{ width: `${widthPercent}%` }}
-        ></div>
+    <div className="flex justify-between items-center">
+      <span className="text-[9px] text-gray-600 uppercase tracking-widest font-bold">{label}</span>
+      <span className={`text-[11px] font-mono font-bold ${highlight ? 'text-white' : 'text-gray-400'}`}>{value}</span>
+    </div>
+  );
+}
+
+function BarRow({ label, count, color }: { label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center text-[9px] font-bold w-full gap-2">
+      <span className="w-8 text-gray-500 uppercase tracking-widest">{label}</span>
+      <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+        <div className={`h-full ${color} transition-all duration-700 ease-out`} style={{ width: count > 0 ? '100%' : '5%' }} />
       </div>
-      <span className="w-6 text-right text-white font-mono font-bold">{count}</span>
+      <span className="w-4 text-right text-white font-mono">{count}</span>
     </div>
   );
 }

@@ -63,20 +63,22 @@ export default function RadarChart({ scores }: { scores: CategoryScores }) {
 
         {/* Axis Labels: BOLD white text */}
         {categories.map((cat, i) => {
-          const labelPoint = getPoint(125, i, 5).split(',');
-          return (
-            <text
-              key={`label-${i}`}
-              x={labelPoint[0]}
-              y={labelPoint[1]}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="fill-white font-black text-[10px] uppercase tracking-[0.2em]"
-            >
-              {cat.label}
-            </text>
-          );
-        })}
+        // Increase multiplier from 125 to 145 to move labels outside the web
+        const labelPoint = getPoint(145, i, 5).split(','); 
+        return (
+          <text
+            key={`label-${i}`}
+            x={labelPoint[0]}
+            y={labelPoint[1]}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            // Make text even smaller so it doesn't clip
+            className="fill-white font-bold text-[8px] uppercase tracking-widest"
+          >
+            {cat.label}
+          </text>
+        );
+      })}
       </svg>
     </div>
   );
