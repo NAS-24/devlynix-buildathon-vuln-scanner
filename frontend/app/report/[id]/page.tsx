@@ -48,7 +48,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         <script 
           id="report-data" 
           type="application/json" 
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(reportData) }} 
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(reportData).replace(/</g, '\\u003c') }}
         />
         
       </div>

@@ -9,7 +9,7 @@ from nanoid import generate
 from pydantic import BaseModel
 from groq import Groq
 from dotenv import load_dotenv
-from database import save_scan_result, get_scan_result
+from database import save_scan_result, get_scan_result, get_recent_scans_by_user
 
 # Scanner imports
 from scanners.headers.csp_scanner import CSPScanner
@@ -95,7 +95,7 @@ async def verify_vuln(target_url: str, vuln_name: str):
     }
 
 @app.get("/api/stream-scan")
-async def stream_scan(target_url: str):
+async def stream_scan(target_url: str, user_id: str = "anonymous"): # <-- Added user_id parameter
     async def event_generator():
         try:
             yield f"data: {json.dumps({'status': 'started', 'target': target_url})}\n\n"
@@ -126,15 +126,20 @@ async def stream_scan(target_url: str):
                     yield f"data: {json.dumps({'status': 'progress', 'result': res})}\n\n"
                     await asyncio.sleep(0.2)
 
+            # --- THE FIX IS HERE ---
             report_id = await save_scan_result(
                 target_url=target_url,
                 risk_score=calculate_risk_score(all_results),
+                radar_scores={}, # <-- FIX 1: Added missing required parameter
                 vulnerabilities=all_results,
-                user_id="anonymous"
+                user_id=user_id  # <-- FIX 2: Replaced hardcoded "anonymous"
             )
+            
             yield f"data: {json.dumps({'status': 'complete', 'report_id': report_id})}\n\n"
 
         except Exception as e:
+            # Print the error to your terminal so you can see if it fails again
+            print(f"Scan Stream Error: {str(e)}") 
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
@@ -144,3 +149,8 @@ async def get_report(report_id: str):
     doc = await get_scan_result(report_id)
     if not doc: raise HTTPException(status_code=404, detail="Report not found")
     return doc
+
+@app.get("/api/reports/history")
+async def get_history(user_id: str):
+    reports = await get_recent_scans_by_user(user_id)
+    return reports

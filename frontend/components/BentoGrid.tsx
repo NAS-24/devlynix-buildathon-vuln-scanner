@@ -1,10 +1,11 @@
 'use client';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ScanInput from './ScanInput';
 import RiskScoreCell from './RiskScoreCell';
 import VulnCard from './VulnCard';
 import LiveFeed from './LiveFeed';
 import ShareCell from './ShareCell';
+import LogoutButton from './LogoutButton'; // Added Logout
 
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1, info: 0,
@@ -51,14 +52,17 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
   const handleScan = (url: string) => {
     if (eventSourceRef.current) eventSourceRef.current.close();
     
-    setCurrentUrl(url); // Set the active scan URL
+    setCurrentUrl(url);
     setLiveVulns([]);
     setLiveScore(100);
     setFinishedReportId('');
     setIsScanning(true);
 
+    const userId = localStorage.getItem('user_id') || 'anonymous';
+    
+    // Add &user_id= to the EventSource URL
     const eventSource = new EventSource(
-      `http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}`
+      `http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}&user_id=${userId}`
     );
     eventSourceRef.current = eventSource;
 
@@ -87,9 +91,23 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
   const bottomCards = getBottomCards(liveVulns);
 
   return (
-    <div className="w-full px-8 lg:px-16 flex flex-col gap-6 pb-12 mt-6">
+    // 1. ADDED THE ID HERE:
+    <div id="recon-dashboard" className="w-full px-8 lg:px-16 flex flex-col gap-6 pb-12 mt-6">
+      
+      {/* Header with Logout */}
+      <div className="flex justify-between items-center w-full">
+        <h1 className="text-white font-black text-lg tracking-widest uppercase">Recon Audit</h1>
+        {/* 2. HIDDEN FROM PDF: */}
+        <div data-html2canvas-ignore>
+          <LogoutButton />
+        </div>
+      </div>
+
       {!isReportView && (
-        <ScanInput onScan={handleScan} disabled={isScanning} />
+        // 3. HIDDEN FROM PDF:
+        <div data-html2canvas-ignore className="w-full">
+          <ScanInput onScan={handleScan} disabled={isScanning} />
+        </div>
       )}
 
       {isScanning && (
@@ -122,7 +140,15 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
         </div>
       )}
 
-      <ShareCell reportId={finishedReportId} />
+      {/* 4. HIDDEN FROM PDF (You don't want the download buttons inside the downloaded PDF): */}
+      <div data-html2canvas-ignore className="w-full">
+        <ShareCell 
+          reportId={finishedReportId} 
+          results={liveVulns} 
+          targetUrl={currentUrl}
+          score={liveScore}
+        />
+      </div>
     </div>
   );
 }

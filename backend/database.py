@@ -42,3 +42,12 @@ async def get_scan_result(report_id: str):
     """Fetches a scan by its unique ID (for the shareable link)."""
     document = await scans_collection.find_one({"report_id": report_id}, {"_id": 0})
     return document
+
+async def get_recent_scans_by_user(user_id: str, limit: int = 5):
+    """Fetches the N most recent scans for a specific user."""
+    cursor = scans_collection.find(
+        {"user_id": user_id}, 
+        {"_id": 0, "report_id": 1, "target_url": 1, "timestamp": 1}
+    ).sort("timestamp", -1).limit(limit)
+    
+    return await cursor.to_list(length=limit)

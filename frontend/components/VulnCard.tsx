@@ -68,7 +68,8 @@ export default function VulnCard({
   return (
     <div
       onClick={() => !passed && setIsExpanded(!isExpanded)}
-      className={`relative p-5 rounded-lg border border-[#222] border-l-4 ${borderAccent} bg-[#111111] flex flex-col transition-all duration-300 shadow-xl ${
+      // ADD break-inside-avoid RIGHT HERE:
+      className={`break-inside-avoid relative p-5 rounded-lg border border-[#222] border-l-4 ${borderAccent} bg-[#111111] flex flex-col transition-all duration-300 shadow-xl ${
         !passed ? 'cursor-pointer hover:border-recon-accentGreen/30 hover:bg-[#161616]' : 'cursor-default'
       } ${isExpanded ? 'h-auto min-h-[280px] border-recon-accentGreen/30' : 'h-[220px]'}`}
     >
