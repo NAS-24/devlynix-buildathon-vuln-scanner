@@ -24,7 +24,10 @@ export default function ShareCell({ reportId, results = [] }: any) {
     const userId = localStorage.getItem('user_id');
     if (!userId) return;
 
-    fetch(`http://127.0.0.1:8000/api/reports/history?user_id=${userId}`)
+    // Use environment variable for the backend URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+    fetch(`${apiUrl}/api/reports/history?user_id=${userId}`)
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(err => console.error("Failed to load history", err));
@@ -48,12 +51,11 @@ export default function ShareCell({ reportId, results = [] }: any) {
   };
 
   return (
-    // We add a specific 'print:hidden' class here so the download box doesn't show up in the PDF
     <div className="w-full p-8 rounded-xl bg-[#111111] border border-[#222222] shadow-lg print:hidden">
       <h2 className="text-white font-bold text-[10px] uppercase tracking-[0.3em] mb-6">Share Report</h2>
       
       <div className="flex items-center justify-between bg-black border border-[#222222] p-4 rounded-lg mb-6">
-        <span className={`font-mono text-xs font-bold tracking-widest truncate mr-4 ${isReady ? 'text-recon-accentGreen' : 'text-gray-700'}`}>
+        <span className={`font-mono text-xs font-bold tracking-widest truncate mr-4 ${isReady ? 'text-emerald-500' : 'text-gray-700'}`}>
           {shareUrl ?? 'Scan a target to generate a report link'}
         </span>
         <button onClick={handleCopy} disabled={!isReady} className="text-[9px] font-black uppercase px-4 py-2 bg-[#222222] hover:bg-[#333333] text-white rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -62,7 +64,6 @@ export default function ShareCell({ reportId, results = [] }: any) {
       </div>
 
       <div className="flex gap-4 mb-8">
-        {/* Reverted back to the native window.print() */}
         <button onClick={() => window.print()} className="flex-1 py-4 border border-[#222222] rounded-lg hover:border-white text-gray-400 hover:text-white transition-all text-[9px] font-black uppercase cursor-pointer">
           PDF
         </button>
