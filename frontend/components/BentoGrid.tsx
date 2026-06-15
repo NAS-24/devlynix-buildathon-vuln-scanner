@@ -6,7 +6,6 @@ import VulnCard from './VulnCard';
 import LiveFeed from './LiveFeed';
 import ShareCell from './ShareCell';
 
-// ── Severity ordering for sorting ────────────────────────────────
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 4, high: 3, medium: 2, low: 1, info: 0,
 };
@@ -44,14 +43,23 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
   const [liveVulns, setLiveVulns] = useState<any[]>(reportData?.vulnerabilities || []);
   const [liveScore, setLiveScore] = useState(reportData?.risk_score ?? 100);
   const [finishedReportId, setFinishedReportId] = useState<string>(reportData?.report_id ?? '');
+  const [currentUrl, setCurrentUrl] = useState<string>(reportData?.target_url ?? '');
+  
+  const [isScanning, setIsScanning] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleScan = (url: string) => {
     if (eventSourceRef.current) eventSourceRef.current.close();
+    
+    setCurrentUrl(url); // Set the active scan URL
     setLiveVulns([]);
     setLiveScore(100);
-    
-    const eventSource = new EventSource(`http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}`);
+    setFinishedReportId('');
+    setIsScanning(true);
+
+    const eventSource = new EventSource(
+      `http://127.0.0.1:8000/api/stream-scan?target_url=${encodeURIComponent(url)}`
+    );
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
@@ -65,8 +73,14 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
         });
       } else if (data.status === 'complete') {
         setFinishedReportId(data.report_id ?? '');
+        setIsScanning(false);
         eventSource.close();
       }
+    };
+
+    eventSource.onerror = () => {
+      setIsScanning(false);
+      eventSource.close();
     };
   };
 
@@ -74,27 +88,35 @@ export default function BentoGrid({ reportData, isReportView = false }: any) {
 
   return (
     <div className="w-full px-8 lg:px-16 flex flex-col gap-6 pb-12 mt-6">
-      {!isReportView && <ScanInput onScan={handleScan} />}
+      {!isReportView && (
+        <ScanInput onScan={handleScan} disabled={isScanning} />
+      )}
+
+      {isScanning && (
+        <div className="w-full p-4 bg-[#111] border border-recon-accentGreen/20 rounded-lg flex items-center gap-3 animate-pulse">
+          <div className="w-2 h-2 rounded-full bg-recon-accentGreen animate-ping" />
+          <span className="text-[10px] uppercase tracking-widest text-recon-accentGreen font-bold">
+            Reconnaissance in progress...
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Risk Assessment becomes the lead panel */}
         <div className="col-span-1 lg:col-span-1 h-[450px]">
           <RiskScoreCell realScore={liveScore} vulnerabilities={liveVulns} />
         </div>
-        
-        {/* Live Feed expands to take the remaining space */}
         <div className="col-span-1 lg:col-span-3 min-h-[450px]">
           <LiveFeed results={liveVulns} />
         </div>
       </div>
 
-      {/* Dynamic Vuln Cards */}
       {bottomCards.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {bottomCards.map((v, idx) => (
             <VulnCard
               key={v.vulnerability_name ?? idx}
               result={{ ...v, tier: getTier(v.vulnerability_name) }}
+              targetUrl={currentUrl} 
             />
           ))}
         </div>
